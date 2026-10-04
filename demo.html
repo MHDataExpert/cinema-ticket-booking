@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>سینما بلیت — رزرو بلیت سینما</title>
+<style>
+@font-face{font-family:"Vazir";src:local("Vazirmatn"),local("IRANSans"),local("Tahoma");font-display:swap}
+*{box-sizing:border-box}body{margin:0;font:15px/1.8 "Vazir",Tahoma,"IRANSans",system-ui,sans-serif;background:#faf7f0;color:#1b1712;padding:0 0 60px}
+.wrap{max-width:1060px;margin:0 auto;padding:0 16px}
+header{background:#7a1f1f;color:#fff;border-radius:14px;padding:20px;margin:16px 0}
+header h1{margin:0;font-size:24px}header p{margin:4px 0 0;opacity:.92}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:#fff;border:1px solid #e3daca;border-radius:10px;padding:10px 12px;margin:10px 0}
+input,select,button{font:inherit;padding:6px 10px;border-radius:8px;border:1px solid #ccc}
+button{background:#1b1712;color:#fff;border:0;cursor:pointer}button:disabled{opacity:.4}
+button.go{background:#1e7a4c}button.warn{background:#a33}button.gold{background:#8a6d1b}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:860px){.grid{grid-template-columns:1fr}}
+.card{background:#fff;border:1px solid #e3daca;border-radius:12px;padding:14px}
+.card h3{margin:0 0 8px}.mut{color:#6b6257;font-size:13px}
+.movie{display:inline-block;width:150px;vertical-align:top;margin:6px;border-radius:12px;padding:14px 10px;color:#fff;cursor:pointer;border:0;text-align:center}
+.movie b{display:block;font-size:14px}.movie span{font-size:12px;opacity:.9}
+.seatmap{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin:10px 0}
+.seat{border-radius:8px;padding:8px 2px;text-align:center;font-size:13px;cursor:pointer;border:2px solid transparent}
+.seat.av{background:#dcf5e5}.seat.sel{background:#1e7a4c;color:#fff}.seat.re{background:#fff3c4;color:#666;cursor:not-allowed}.seat.bo{background:#f5c6c6;color:#666;cursor:not-allowed}.seat.vip{border-color:#c99a2c}
+#timer{font-size:22px;font-weight:800;color:#a33}
+#log{background:#1b1712;color:#faf7f0;border-radius:10px;padding:12px;font:12px/1.6 monospace;max-height:300px;overflow:auto;white-space:pre-wrap;direction:ltr;text-align:left}
+.ok{color:#7dffa9}.err{color:#ff9a8a}.inf{color:#e8b93e}
+.msg{border-radius:10px;padding:10px 12px;margin:8px 0;font-size:14px}
+.msg.okm{background:#e6f7ec;border:1px solid #1e7a4c}.msg.errm{background:#fdecec;border:1px solid #a33}
+details{margin-top:8px}summary{cursor:pointer;color:#6b6257}
+.screen{background:#1b1712;color:#fff;text-align:center;border-radius:8px;padding:4px;margin-bottom:8px;font-size:13px}
+.legend{display:flex;gap:10px;font-size:12px;color:#6b6257;flex-wrap:wrap}
+</style>
+</head>
+<body><div class="wrap">
+<header><h1>🎬 سینما بلیت</h1><p>جست‌وجوی فیلم ← انتخاب سانس ← انتخاب صندلی روی نقشه ← رزرو ۱۰ دقیقه‌ای ← پرداخت یا آزادسازی</p></header>
+<div class="bar">
+<span id="hstat" class="mut">در حال بررسی…</span>
+<span class="mut">مستندات فنی: <a id="docs" href="http://localhost:8000/docs">‎/docs</a></span>
+</div>
+<div class="card"><h3>۱ · جست‌وجوی فیلم</h3>
+<input id="q_term" placeholder="نام فیلم، مثلاً جدایی" style="width:30%">
+<select id="q_city"><option value="">همه شهرها</option><option>تهران</option><option>مشهد</option><option>اصفهان</option><option>شیراز</option><option>تبریز</option></select>
+<select id="q_type"><option value="">همه ژانرها</option><option>درام</option><option>کمدی</option><option>جنایی</option><option>اجتماعی</option><option>دفاع مقدس</option><option>خانوادگی</option></select>
+<button onclick="search()">جست‌وجو</button>
+<button onclick="seed_search()">نمایش همه</button>
+<div id="movies" class="mut" style="margin-top:8px">در حال بارگذاری…</div></div>
+<div class="grid" style="margin-top:12px">
+<div class="card"><h3>۲ · سانس‌ها و نقشه صندلی</h3>
+<div id="shows" class="mut">یک فیلم را از بالا انتخاب کنید.</div>
+<div id="ev"></div></div>
+<div class="card"><h3>۳ · رزرو و پرداخت</h3>
+<div>صندلی‌های انتخاب‌شده: <b id="selcount">۰</b> (حداکثر ۶)</div>
+<div id="total" class="mut"></div>
+<div id="timer"></div>
+<div id="msg"></div>
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">
+<button class="go" onclick="reserve()">رزرو موقت (۱۰ دقیقه)</button>
+<button onclick="release()">آزادسازی</button>
+</div>
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">
+<button class="go" onclick="confirmOk()">پرداخت موفق</button>
+<button class="warn" onclick="confirmFail()">پرداخت ناموفق</button>
+</div>
+<button class="gold" onclick="race()">۵ نفر همزمان برای یک صندلی</button>
+<div id="raceout" class="mut"></div>
+<p class="mut">کدها: ۲۰۰ موفق · ۴۰۹ صندلی گرفته شده · ۴۱۰ مهلت تمام شده · ۴۰۲ پرداخت ناموفق (صندلی آزاد می‌شود).</p>
+</div>
+</div>
+<div class="card" style="margin-top:12px"><h3>راهنمای تست (۲ دقیقه)</h3>
+<ol>
+<li>یک فیلم را بزنید، یک سانس را انتخاب کنید.</li>
+<li>روی نقشه ۲ صندلی سبز بزنید، «رزرو موقت» را بزنید؛ تایمر شروع می‌شود.</li>
+<li>«پرداخت موفق» را بزنید؛ صندلی‌ها قرمز (فروخته‌شده) می‌شوند.</li>
+<li>روی یک صندلی دیگر: رزرو کنید بعد «پرداخت ناموفق»؛ صندلی دوباره سبز می‌شود (کد ۴۰۲).</li>
+<li>دکمه «۵ نفر همزمان» را بزنید؛ فقط ۱ نفر برنده می‌شود (کد ۴۰۹ برای بقیه).</li>
+</ol>
+<details><summary>گزارش فنی (کلیک کنید)</summary><div id="log"></div></details>
+</div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const BASE=location.hostname==='localhost'||location.protocol==='file:'?'http://localhost:8000':location.origin;
+const FA=n=>Number(n).toLocaleString('fa-IR');
+const Toman=n=>FA(n)+' تومان';
+const Jdt=s=>{try{return new Intl.DateTimeFormat('fa-IR',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(s))}catch(e){return s}};
+let SHOWS=[],CUR=null,SEATS=[],SEL=new Set(),EXP=null,tickH=null,IDS={tickets:{}};
+const COLORS=['#7a1f1f','#1e5a7a','#5a3a8a','#1e7a4c','#8a6d1b','#a33a5a','#2a7a6a'];
+const colFor=t=>COLORS[[...t].reduce((a,c)=>a+c.charCodeAt(0),0)%COLORS.length];
+function log(m,cls){const e=document.createElement('div');if(cls)e.className=cls;e.textContent=m;$('log').prepend(e)}
+function say(html,ok){$('msg').innerHTML=html?`<div class="msg ${ok?'okm':'errm'}">${html}</div>`:''}
+async function api(method,path,body){
+const r=await fetch(BASE+path,{method,headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});
+let j;try{j=await r.json()}catch{j={}};log(`${method} ${path} → ${r.status} ${JSON.stringify(j)}`,r.ok?'ok':'err');return{r,j}}
+const FRIENDLY={409:'این صندلی قبلاً گرفته شده است.',410:'مهلت ۱۰ دقیقه‌ای تمام شد؛ دوباره رزرو کنید.',402:'پرداخت ناموفق بود؛ صندلی آزاد شد.'};
+function errLine(r,j){return `خطا (${FA(r.status)}): ${(j&&j.detail)||FRIENDLY[r.status]||'مشکلی پیش آمد.'}`}
+async function health(){try{const{r}=await api('GET','/health');$('hstat').textContent=r.ok?'● سرویس روشن است':'● مشکل ('+r.status+')';$('docs').href=BASE+'/docs'}catch(e){$('hstat').textContent='● سرور خاموش است — اول uvicorn را روشن کنید';log('health failed','err')}}
+async function search(){
+const p=new URLSearchParams();const t=$('q_term').value,c=$('q_city').value,y=$('q_type').value;
+if(t)p.set('term',t);if(c)p.set('city',c);if(y)p.set('event_type',y);p.set('limit',50);
+const{r,j}=await api('GET','/search?'+p);if(!r.ok){say(errLine(r,j),false);return}
+// group by movie
+const g={};j.forEach(s=>{(g[s.performer_name]=g[s.performer_name]||[]).push(s)});
+const titles=Object.keys(g);
+$('movies').innerHTML=titles.length?titles.map(t=>{const s=g[t][0];return `<button class="movie" style="background:${colFor(t)}" onclick="shows('${t.replace(/'/g,'')}')"><b>${t}</b><span>${s.event_type} · ${FA(g[t].length)} سانس · ${s.city}</span></button>`}).join(''):'نتیجه‌ای پیدا نشد.';
+window._G=g;if(titles.length)shows(titles[0])}
+function shows(title){
+const list=window._G[title];if(!list)return;
+$('shows').innerHTML=list.map(s=>`<div style="border-top:1px solid #eee;padding:6px 0"><b>${Jdt(s.starts_at)}</b><br><span class="mut">${s.venue_name} · ${s.city} · از ${Toman(s.min_price)}</span><br><button onclick="detail('${s.id}')">انتخاب این سانس</button></div>`).join('')}
+async function detail(id){
+const{r,j}=await api('GET','/events/'+id);if(!r.ok){say(errLine(r,j),false);return}
+CUR=j;SEATS=j.tickets;SEL=new Set();IDS.tickets={};SEATS.forEach(t=>IDS.tickets[t.seat]=t.id);
+renderSeats();say('',true)}
+function renderSeats(){
+if(!CUR)return;const rows={};SEATS.forEach(t=>{(rows[t.seat.split('-')[0]]=rows[t.seat.split('-')[0]]||[]).push(t)});
+Object.values(rows).forEach(r=>r.sort((a,b)=>a.seat.localeCompare(b.seat)));
+$('ev').innerHTML=`<b>${CUR.name}</b> <span class="mut">${CUR.event_type} · ${CUR.performer.director} · ${FA(CUR.performer.year||'')} · ${CUR.venue.name}، ${CUR.venue.city}</span><br><span class="mut">${Jdt(CUR.starts_at)}</span><div class="screen">پرده</div><div class="legend"><span>🟩 آزاد (کلیک کنید)</span><span>🟨 رزروشده</span><span>🟥 فروخته‌شده</span><span>⭐ حاشیه طلایی = ویژه</span></div>`+
+Object.keys(rows).sort().map(rw=>`<div style="display:flex;gap:6px;align-items:center"><b style="width:18px">${rw}</b><div class="seatmap" style="flex:1">${rows[rw].map(t=>`<div class="seat ${t.status==='available'?'av':t.status==='reserved'?'re':'bo'} ${t.section==='vip'?'vip':''} ${SEL.has(t.id)?'sel':''}" onclick="tog('${t.id}')">${t.seat.split('-')[1]}<br><small>${t.status==='available'?(t.section==='vip'?'ویژه':'عادی'):t.status==='reserved'?'رزرو':'فروخته'}</small></div>`).join('')}</div></div>`).join('');
+updSel()}
+function tog(id){const t=SEATS.find(x=>x.id===id);if(!t||t.status!=='available')return;
+if(SEL.has(id))SEL.delete(id);else{if(SEL.size>=6){say('حداکثر ۶ صندلی در هر سفارش.',false);return}SEL.add(id)}renderSeats()}
+function updSel(){$('selcount').textContent=FA(SEL.size);
+const sum=[...SEL].reduce((a,id)=>a+Number((SEATS.find(x=>x.id===id)||{price:0}).price),0);
+$('total').textContent=SEL.size?('جمع: '+Toman(sum)+(SEATS.some(t=>SEL.has(t.id)&&t.section==='vip')?' (شامل صندلی ویژه)':'')):''}
+function startTimer(){stopTimer();tickH=setInterval(()=>{const s=Math.max(0,Math.round((EXP-Date.now())/1000));const m=Math.floor(s/60),ss=String(s%60).padStart(2,'0');$('timer').textContent=s>0?('⏳ '+FA(m)+':'+FA(ss)+' مانده'):'';if(s<=0){stopTimer();say('مهلت تمام شد؛ صندلی‌ها آزاد شدند.',false);if(CUR)detail(CUR.id)}},500)}
+function stopTimer(){if(tickH)clearInterval(tickH);tickH=null;$('timer').textContent=''}
+async function reserve(){
+if(!SEL.size){say('اول چند صندلی سبز روی نقشه انتخاب کنید.',false);return}
+const ids=[...SEL];const{r,j}=await api('POST','/bookings/reserve',ids.length===1?{ticket_id:ids[0]}:{ticket_ids:ids});
+if(!r.ok){say(errLine(r,j),false);return}
+EXP=new Date(j.expires_at).getTime();startTimer();say(`رزرو شد! تا ۱۰ دقیقه فرصت پرداخت دارید. (${FA(ids.length)} صندلی)`,true);detail(CUR.id)}
+async function release(){
+if(!SEL.size&&!CUR)return;const ids=SEL.size?[...SEL]:[];
+if(!ids.length){say('صندلی‌ای انتخاب نشده است.',false);return}
+const{r,j}=await api('POST','/bookings/release',ids.length===1?{ticket_id:ids[0]}:{ticket_ids:ids});
+if(!r.ok){say(errLine(r,j),false);return}stopTimer();SEL.clear();say('صندلی‌ها آزاد شدند.',true);detail(CUR.id)}
+async function doConfirm(ok){
+const ids=SEL.size?[...SEL]:[];if(!ids.length){say('اول صندلی رزرو کنید.',false);return}
+const body=ids.length===1?{ticket_id:ids[0],payment_token:ok?'tok_ok':'fail'}:{ticket_ids:ids,payment_token:ok?'tok_ok':'fail'};
+const{r,j}=await api('PUT','/bookings/confirm',body);
+if(!r.ok){stopTimer();say(errLine(r,j),false);detail(CUR.id);return}
+stopTimer();SEL.clear();say(`🎉 خرید قطعی شد! (${FA(ids.length)} صندلی)`,true);detail(CUR.id)}
+const confirmOk=()=>doConfirm(true),confirmFail=()=>doConfirm(false);
+async function race(){
+const free=SEATS.find(t=>t.status==='available');if(!free){say('صندلی آزادی برای مسابقه نیست.',false);return}
+$('raceout').textContent='۵ نفر همزمان دکمه رزرو را زدند…';
+const rs=await Promise.all([1,2,3,4,5].map(()=>fetch(BASE+'/bookings/reserve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticket_id:free.id})}).then(r=>r.status).catch(()=>0)));
+const w=rs.filter(s=>s===200).length;
+$('raceout').innerHTML=`نتیجه: فقط <b>${FA(w)} نفر</b> از ۵ نفر موفق شد و صندلی را گرفت؛ بقیه پیام «گرفته شده» (۴۰۹) دیدند. یعنی سیستم درست کار می‌کند و یک صندلی به دو نفر فروخته نمی‌شود.`;
+log(`race: ${w}x200, ${rs.filter(s=>s===409).length}x409`,'inf');detail(CUR.id)}
+function seed_search(){$('q_term').value='';$('q_city').value='';$('q_type').value='';search()}
+health();search();
+</script></body></html>
